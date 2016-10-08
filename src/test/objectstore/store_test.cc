@@ -3752,7 +3752,7 @@ public:
     return status;
   }
 
-  int write() {
+  int write(unsigned write_count = 1) {
     Mutex::Locker locker(lock);
     EnterExit ee("write");
     if (!can_unlink())
@@ -3763,36 +3763,38 @@ public:
     available_objects.erase(new_obj);
     ObjectStore::Transaction t;
 
-    boost::uniform_int<> u1(0, max_object_len - max_write_len);
-    boost::uniform_int<> u2(0, max_write_len);
-    uint64_t offset = u1(*rng);
-    uint64_t len = u2(*rng);
-    bufferlist bl;
-    if (write_alignment) {
-      offset = ROUND_UP_TO(offset, write_alignment);
-      len = ROUND_UP_TO(len, write_alignment);
-    }
-
-    filled_byte_array(bl, len);
-
-    bufferlist& data = contents[new_obj].data;
-    if (data.length() <= offset) {
-      if (len > 0) {
-        data.append_zero(offset-data.length());
-        data.append(bl);
+    while (write_count--) {
+      boost::uniform_int<> u1(0, max_object_len - max_write_len);
+      boost::uniform_int<> u2(0, max_write_len);
+      uint64_t offset = u1(*rng);
+      uint64_t len = u2(*rng);
+      bufferlist bl;
+      if (write_alignment) {
+        offset = ROUND_UP_TO(offset, write_alignment);
+        len = ROUND_UP_TO(len, write_alignment);
       }
-    } else {
-      bufferlist value;
-      assert(data.length() > offset);
-      data.copy(0, offset, value);
-      value.append(bl);
-      if (value.length() < data.length())
-        data.copy(value.length(),
-		  data.length()-value.length(), value);
-      value.swap(data);
-    }
 
-    t.write(cid, new_obj, offset, len, bl);
+      filled_byte_array(bl, len);
+
+      bufferlist& data = contents[new_obj].data;
+      if (data.length() <= offset) {
+        if (len > 0) {
+          data.append_zero(offset-data.length());
+          data.append(bl);
+        }
+      } else {
+        bufferlist value;
+        assert(data.length() > offset);
+        data.copy(0, offset, value);
+        value.append(bl);
+        if (value.length() < data.length())
+          data.copy(value.length(),
+                    data.length()-value.length(), value);
+        value.swap(data);
+      }
+
+      t.write(cid, new_obj, offset, len, bl);
+    }
     ++in_flight;
     in_flight_objects.insert(new_obj);
     int status = store->queue_transaction(osr, std::move(t), new C_SyntheticOnReadable(this, new_obj));
@@ -5555,6 +5557,7 @@ void doMany4KWritesTest(boost::scoped_ptr<ObjectStore>& store,
                         unsigned max_object_size,
                         unsigned max_write_size,
                         unsigned write_alignment,
+                        unsigned write_in_transaction,
                         store_statfs_t* res_stat)
 {
   ObjectStore::Sequencer osr("test");
@@ -5580,7 +5583,7 @@ void doMany4KWritesTest(boost::scoped_ptr<ObjectStore>& store,
       cerr << "Op " << i << std::endl;
       test_obj.print_internal_state();
     }
-    test_obj.write();
+    test_obj.write(write_in_transaction);
   }
   test_obj.wait_for_done();
   if (res_stat) {
@@ -5595,7 +5598,7 @@ TEST_P(StoreTest, Many4KWritesTest) {
   store_statfs_t res_stat;
   unsigned max_object = 4*1024*1024;
 
-  doMany4KWritesTest(store, 1, 1000, 4*1024*1024, 4*1024, 0, &res_stat);
+  doMany4KWritesTest(store, 1, 1000, 4*1024*1024, 4*1024, 0, 1, &res_stat);
 
   ASSERT_LE(res_stat.stored, max_object);
   ASSERT_EQ(res_stat.allocated, max_object);
@@ -5609,7 +5612,7 @@ TEST_P(StoreTest, Many4KWritesNoCSumTest) {
   store_statfs_t res_stat;
   unsigned max_object = 4*1024*1024;
 
-  doMany4KWritesTest(store, 1, 1000, max_object, 4*1024, 0, &res_stat );
+  doMany4KWritesTest(store, 1, 1000, max_object, 4*1024, 0, 1, &res_stat);
 
   ASSERT_LE(res_stat.stored, max_object);
   ASSERT_EQ(res_stat.allocated, max_object);
@@ -5621,7 +5624,7 @@ TEST_P(StoreTest, TooManyBlobsTest) {
     return;
   store_statfs_t res_stat;
   unsigned max_object = 4*1024*1024;
-  doMany4KWritesTest(store, 1, 1000, max_object, 4*1024, 0, &res_stat);
+  doMany4KWritesTest(store, 1, 1000, max_object, 4*1024, 0, 10, &res_stat);
   ASSERT_LE(res_stat.stored, max_object);
   ASSERT_EQ(res_stat.allocated, max_object);
 }
