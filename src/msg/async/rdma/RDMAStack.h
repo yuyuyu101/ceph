@@ -188,6 +188,8 @@ class RDMAWorker : public Worker {
   virtual void initialize() override;
   RDMAStack *get_stack() { return stack; }
 
+  virtual void get_registered_memory(bufferlist &bl, unsigned len) override;
+
   int reserve_message_buffer(RDMAConnectedSocketImpl *o, std::vector<Chunk*> &c, size_t bytes);
   void post_tx_buffer(std::vector<Chunk*> &chunks);
   void remove_pending_conn(RDMAConnectedSocketImpl *o) {

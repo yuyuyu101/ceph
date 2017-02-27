@@ -380,6 +380,30 @@ void RDMAWorker::initialize()
   }
 }
 
+void RDMAWorker::get_registered_memory(bufferlist &bl, unsigned len)
+{
+  std::vector<Chunk*> buffers;
+  int r = reserve_message_buffer(nullptr, buffers, len);
+  assert(r >= 0);
+  unsigned got = infiniband->get_memory_manager()->get_tx_chunk_size() * r;
+  ldout(cct, 20) << __func__ << " need " << len << ", got " << got << "(" << r << " chunks)"<< dendl;
+  for (auto c : buffers) {
+    c->shared = 1;
+    bl.push_back(buffer::claim_buffer(
+            c->bytes, c->buffer,
+            make_deleter([this, c] {
+                           std::vector<Chunk*> buffers;
+                           buffers.push_back(c);
+                           post_tx_buffer(buffers);
+                         })));
+  }
+
+  if (got < len) {
+    perf_logger->inc(l_msgr_rdma_rx_no_registered_mem);
+    bl.push_back(buffer::create_page_aligned(len - got));
+  }
+}
+
 void RDMAWorker::notify()
 {
   uint64_t i = 1;

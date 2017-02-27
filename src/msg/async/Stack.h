@@ -248,6 +248,12 @@ class Worker {
 
   virtual void initialize() {}
   PerfCounters *get_perf_counter() { return perf_logger; }
+
+  // backend need to override this method if providing registered memory
+  virtual void get_registered_memory(bufferlist &bl, unsigned len) {
+    bl.push_back(buffer::create_page_aligned(len));
+  }
+
   void release_worker() {
     int oldref = references.fetch_sub(1);
     assert(oldref > 0);

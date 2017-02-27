@@ -97,7 +97,7 @@ class C_tick_wakeup : public EventCallback {
   }
 };
 
-static void alloc_aligned_buffer(bufferlist& data, unsigned len, unsigned off)
+static void alloc_aligned_buffer(Worker *worker, bufferlist& data, unsigned len, unsigned off)
 {
   // create a buffer to read into that matches the data alignment
   unsigned left = len;
@@ -110,7 +110,7 @@ static void alloc_aligned_buffer(bufferlist& data, unsigned len, unsigned off)
   }
   unsigned middle = left & CEPH_PAGE_MASK;
   if (middle > 0) {
-    data.push_back(buffer::create_page_aligned(middle));
+    worker->get_registered_memory(data, middle);
     left -= middle;
   }
   if (left) {
@@ -624,7 +624,7 @@ void AsyncConnection::process()
               data_blp = data_buf.begin();
             } else {
               ldout(async_msgr->cct,20) << __func__ << " allocating new rx buffer at offset " << data_off << dendl;
-              alloc_aligned_buffer(data_buf, data_len, data_off);
+              alloc_aligned_buffer(worker, data_buf, data_len, data_off);
               data_blp = data_buf.begin();
             }
           }
