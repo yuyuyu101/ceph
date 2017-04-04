@@ -288,6 +288,7 @@ class NetworkStack : public CephContext::ForkWatcher {
   CephContext *cct;
   vector<Worker*> workers;
   // Used to indicate whether thread started
+  std::atomic<bool> is_ready = {false};
 
   explicit NetworkStack(CephContext *c, const string &t);
  public:
@@ -337,6 +338,9 @@ class NetworkStack : public CephContext::ForkWatcher {
     start();
   }
 
+  void ready() {
+    is_ready = true;
+  }
 };
 
 #endif //CEPH_MSG_ASYNC_STACK_H
