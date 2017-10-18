@@ -242,13 +242,13 @@ add_ceph_unittest(unittest_perf_histogram)
 target_link_libraries(unittest_perf_histogram ceph-common)
 
 # unittest_global_doublefree
-if(WITH_CEPHFS)
+if(WITH_LIBCEPHFS)
   add_executable(unittest_global_doublefree
     test_global_doublefree.cc
     )
   add_ceph_unittest(unittest_global_doublefree)
   target_link_libraries(unittest_global_doublefree cephfs librados)
-endif(WITH_CEPHFS)
+endif(WITH_LIBCEPHFS)
 
 add_executable(unittest_dns_resolve
   dns_resolve.cc

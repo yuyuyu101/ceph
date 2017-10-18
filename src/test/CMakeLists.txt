@@ -483,14 +483,14 @@ if(WITH_FUSE)
     )
 endif(WITH_FUSE)
 
-if(${WITH_CEPHFS})
+if(${WITH_LIBCEPHFS})
   add_executable(test_c_headers
     test_c_headers.c
     )
   target_link_libraries(test_c_headers
     librados
     cephfs)
-endif(${WITH_CEPHFS})
+endif(${WITH_LIBCEPHFS})
 
 if(HAVE_BLKID)
   add_executable(ceph_test_get_blkdev_size
